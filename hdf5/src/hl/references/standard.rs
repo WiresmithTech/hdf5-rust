@@ -2,9 +2,10 @@
 //!
 //! These are gated on v1.12.1 since there appear to be multiple bugs in v1.12.0.
 //!
+use std::mem::MaybeUninit;
 use hdf5_sys::h5o::H5O_type_t;
 use hdf5_sys::h5r::H5R_type_t::H5R_OBJECT2;
-use hdf5_sys::h5r::{H5R_ref_t, H5Rcreate_object, H5Rdestroy, H5Rget_obj_type3, H5Ropen_object};
+use hdf5_sys::h5r::{H5R_ref_t, H5Rcreate_object, H5Rdestroy, H5Rget_obj_type3, H5Ropen_object, H5Rcopy, H5Requal};
 
 use super::ObjectReference;
 use crate::internal_prelude::*;
@@ -18,6 +19,13 @@ impl StdReference {
     fn ptr(&self) -> *const H5R_ref_t {
         std::ptr::addr_of!(self.0)
     }
+
+    fn copy(&self) -> Result<Self> {
+        let mut out = MaybeUninit::<H5R_ref_t>::uninit();
+        h5call!(H5Rcopy(self.ptr(), out.as_mut_ptr()))?;
+        let inited_ref = unsafe { out.assume_init() };
+        Ok(Self(inited_ref))
+    }
 }
 
 //todo: could we query some actual object parameters to make this more useful?
@@ -26,6 +34,18 @@ impl std::fmt::Debug for StdReference {
         f.write_str("StdReference")
     }
 }
+
+impl PartialEq for StdReference {
+    fn eq(&self, other: &Self) -> bool {
+        let result = h5call!(H5Requal(self.ptr(), other.ptr()));
+        match result {
+            Ok(tri) => {tri != 0},
+            Err(_) => {false}
+        }
+    }
+}
+
+impl Eq for StdReference {}
 
 unsafe impl H5Type for StdReference {
     fn type_descriptor() -> hdf5_types::TypeDescriptor {
@@ -40,8 +60,14 @@ impl Drop for StdReference {
 }
 
 #[repr(transparent)]
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct ObjectReference2(StdReference);
+
+impl ObjectReference2 {
+    pub fn try_clone(&self) -> Result<Self> {
+        Ok(Self(self.0.copy()?))
+    }
+}
 
 impl ObjectReference for ObjectReference2 {
     const REF_TYPE: hdf5_sys::h5r::H5R_type_t = H5R_OBJECT2;
@@ -99,6 +125,16 @@ mod tests {
             let dsref = file.reference::<ObjectReference2>("ds").unwrap();
             let ds = file.dereference(&dsref).unwrap();
             assert!(matches!(ds, ReferencedObject::Dataset(_)));
+        })
+    }
+
+    #[test]
+    fn test_reference_clone_and_equal() {
+        with_tmp_file(|file| {
+            file.create_group("g").unwrap();
+            let gref = file.reference::<ObjectReference2>("g").unwrap();
+            let gref2 = gref.try_clone().unwrap();
+            assert_eq!(gref, gref2);
         })
     }
 }
