@@ -262,6 +262,12 @@ jobs:
           $env:PATH="$env:PATH;C:\msys64\mingw64\bin;C:\msys64\usr\bin;"
           C:\msys64\usr\bin\pacman.exe -Syu --noconfirm
           C:\msys64\usr\bin\pacman.exe -S --noconfirm mingw-w64-x86_64-hdf5 mingw-w64-x86_64-pkgconf
+      - name: Dependency Versions
+        shell: pwsh
+        run: |
+          $env:PATH="$env:PATH;C:\msys64\mingw64\bin;"
+          C:\msys64\mingw64\bin\pkg-config.exe --modversion hdf5
+          gcc --version
       - name: Build and test all crates
         shell: pwsh
         run: |
