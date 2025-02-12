@@ -15,13 +15,14 @@ pub enum Color {
 #[derive(H5Type, Clone, PartialEq, Debug)] // register with HDF5
 #[repr(C)]
 pub struct Pixel {
-    xy: (i64, i64),
+    x: i64,
+    y: i64,
     color: Color,
 }
 
 impl Pixel {
     pub fn new(x: i64, y: i64, color: Color) -> Self {
-        Self { xy: (x, y), color }
+        Self { x, y, color }
     }
 }
 
@@ -32,7 +33,7 @@ fn write_hdf5() -> Result<()> {
     #[cfg(feature = "blosc")]
     blosc_set_nthreads(2); // set number of blosc threads
     let builder = group.new_dataset_builder();
-    #[cfg(feature = "blosc")]
+    #[cfg(feature = "blosc-zstd")]
     let builder = builder.blosc_zstd(9, true); // zstd + shuffle
     let ds = builder
         .with_data(&arr2(&[

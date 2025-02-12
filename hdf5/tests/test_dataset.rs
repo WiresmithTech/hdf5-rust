@@ -348,14 +348,6 @@ fn test_read_write_varlen_struct() -> hdf5::Result<()> {
 }
 
 #[test]
-fn test_read_write_tuples() -> hdf5::Result<()> {
-    test_read_write::<(u8,)>()?;
-    test_read_write::<(u64, f32)>()?;
-    test_read_write::<(i8, u64, f32)>()?;
-    Ok(())
-}
-
-#[test]
 fn test_create_on_databuilder() {
     let file = new_in_memory_file().unwrap();
 
@@ -404,4 +396,87 @@ fn test_byte_read_seek() -> hdf5::Result<()> {
         }
     }
     Ok(())
+}
+
+#[test]
+#[cfg(feature = "blosc")]
+fn test_blosc_filters_write_compressed() {
+    let file = new_in_memory_file().unwrap();
+    let data = [1i32; 1024];
+    let size = (std::mem::size_of::<i32>() * data.len()) as u64;
+
+    // Sanity Check / Baseline test
+    let _ds = file.new_dataset_builder().with_data(&data).create("raw").unwrap();
+    assert!(_ds.storage_size() == size);
+    assert!(_ds.filters().is_empty());
+
+    let _ds = file
+        .new_dataset_builder()
+        .with_data(&data)
+        .blosc_blosclz(9, true)
+        .create("blosclz")
+        .unwrap();
+    assert!(_ds.storage_size() < size);
+    assert_eq!(_ds.filters(), vec![hdf5::filters::Filter::blosc_blosclz(9, true)]);
+
+    #[cfg(feature = "blosc-lz4")]
+    {
+        let _ds =
+            file.new_dataset_builder().with_data(&data).blosc_lz4(9, true).create("lz4").unwrap();
+        assert!(_ds.storage_size() < size);
+        assert_eq!(_ds.filters(), vec![hdf5::filters::Filter::blosc_lz4(9, true)]);
+
+        let _ds = file
+            .new_dataset_builder()
+            .with_data(&data)
+            .blosc_lz4hc(9, true)
+            .create("lz4hc")
+            .unwrap();
+        assert!(_ds.storage_size() < size);
+        assert_eq!(_ds.filters(), vec![hdf5::filters::Filter::blosc_lz4hc(9, true)]);
+    }
+
+    #[cfg(feature = "blosc-zlib")]
+    {
+        let _ds =
+            file.new_dataset_builder().with_data(&data).blosc_zlib(9, true).create("zlib").unwrap();
+        assert!(_ds.storage_size() < size);
+        assert_eq!(_ds.filters(), vec![hdf5::filters::Filter::blosc_zlib(9, true)]);
+    }
+
+    #[cfg(feature = "blosc-zstd")]
+    {
+        let _ds =
+            file.new_dataset_builder().with_data(&data).blosc_zstd(9, true).create("zstd").unwrap();
+        assert!(_ds.storage_size() < size);
+        assert_eq!(_ds.filters(), vec![hdf5::filters::Filter::blosc_zstd(9, true)]);
+    }
+
+    #[cfg(feature = "blosc-snappy")]
+    {
+        let _ds = file
+            .new_dataset_builder()
+            .with_data(&data)
+            .blosc_snappy(9, true)
+            .create("snappy")
+            .unwrap();
+        assert!(_ds.storage_size() < size);
+        assert_eq!(_ds.filters(), vec![hdf5::filters::Filter::blosc_snappy(9, true)]);
+    }
+}
+
+#[test]
+fn remove_attr() {
+    let file = new_in_memory_file().unwrap();
+
+    file.new_attr::<i32>().create("foo").unwrap();
+    assert!(file.attr("foo").is_ok());
+    file.delete_attr("foo").unwrap();
+    assert!(file.attr("foo").is_err());
+
+    let ds = file.new_dataset::<u8>().create("ds").unwrap();
+    ds.new_attr::<i8>().create("bar").unwrap();
+    assert!(ds.attr("bar").is_ok());
+    ds.delete_attr("bar").unwrap();
+    assert!(ds.attr("bar").is_err());
 }

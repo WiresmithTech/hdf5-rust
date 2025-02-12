@@ -25,7 +25,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Check spelling
-        uses: crate-ci/typos@685eb3d55be2f85191e8c84acb9f44d7756f84ab # v1.29.4
+        uses: crate-ci/typos@11ca4583f2f3f74c7e7785c0ecb20fe2c99a4308 # v1.29.5
 
   lint:
     name: lint
@@ -59,7 +59,7 @@ jobs:
       - name: Document workspace
         env:
           RUSTDOCFLAGS: "--cfg docsrs"
-        run: cargo doc --features static,zlib,blosc,lzf,f16,complex
+        run: cargo doc --features static,zlib,blosc-all,lzf,f16,complex
 
   brew:
     name: brew
@@ -163,12 +163,12 @@ jobs:
       - name: Build and test all crates
         run: cargo test --workspace -vvv --features hdf5-sys/static,hdf5-sys/zlib --exclude hdf5-metno-derive
       - name: Build and test with filters and other features
-        run: cargo test --workspace -v --features hdf5-sys/static,hdf5-sys/zlib,lzf,blosc,f16,complex --exclude hdf5-metno-derive
+        run: cargo test --workspace -v --features hdf5-sys/static,hdf5-sys/zlib,lzf,blosc-all,f16,complex --exclude hdf5-metno-derive
         if: matrix.rust != 'stable-gnu'
       - name: Run examples
         run: |
-          cargo r --example simple --features hdf5-sys/static,hdf5-sys/zlib,lzf,blosc
-          cargo r --example chunking --features hdf5-sys/static,hdf5-sys/zlib,lzf,blosc
+          cargo r --example simple --features hdf5-sys/static,hdf5-sys/zlib,lzf,blosc-all
+          cargo r --example chunking --features hdf5-sys/static,hdf5-sys/zlib,lzf,blosc-all
         if: matrix.rust != 'stable-gnu'
 
   apt:
